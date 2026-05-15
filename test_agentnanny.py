@@ -3018,6 +3018,36 @@ class TestPatchCodexConfig:
         content = config_path.read_text(encoding="utf-8")
         assert 'notify = ["cmd", "arg1", "arg2"]' in content
 
+    def test_inserts_new_keys_before_first_table(self, tmp_path):
+        codex_home = tmp_path / ".codex"
+        codex_home.mkdir()
+        config_path = codex_home / "config.toml"
+        config_path.write_text('model = "o3"\n[tui]\nstatus_line = []\n', encoding="utf-8")
+
+        with patch.object(agentnanny, "CODEX_HOME", codex_home), \
+             patch.object(agentnanny, "CODEX_CONFIG_PATH", config_path):
+            agentnanny._patch_codex_config({"notify": ["python3", "agentnanny.py"]})
+
+        content = config_path.read_text(encoding="utf-8")
+        assert content.index('notify = ["python3", "agentnanny.py"]') < content.index("[tui]")
+
+    def test_relocates_misplaced_nested_key(self, tmp_path):
+        codex_home = tmp_path / ".codex"
+        codex_home.mkdir()
+        config_path = codex_home / "config.toml"
+        config_path.write_text(
+            'model = "o3"\n[tui]\nnotify = ["bad"]\nstatus_line = []\n',
+            encoding="utf-8",
+        )
+
+        with patch.object(agentnanny, "CODEX_HOME", codex_home), \
+             patch.object(agentnanny, "CODEX_CONFIG_PATH", config_path):
+            agentnanny._patch_codex_config({"notify": ["python3", "agentnanny.py"]})
+
+        content = config_path.read_text(encoding="utf-8")
+        assert 'notify = ["bad"]' not in content
+        assert content.index('notify = ["python3", "agentnanny.py"]') < content.index("[tui]")
+
 
 class TestRemoveCodexConfigKeys:
     def test_removes_key(self, tmp_path):

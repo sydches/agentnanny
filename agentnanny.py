@@ -539,7 +539,7 @@ def _patch_codex_config(updates: dict[str, object]) -> Path:
     """Read ~/.codex/config.toml, apply key=value updates, write back.
 
     Only touches top-level keys. Preserves existing content and comments
-    by replacing matching lines or appending new ones.
+    by replacing matching lines or inserting new ones before the first table.
     """
     CODEX_HOME.mkdir(parents=True, exist_ok=True)
     lines: list[str] = []
@@ -548,19 +548,31 @@ def _patch_codex_config(updates: dict[str, object]) -> Path:
 
     remaining = dict(updates)
     new_lines: list[str] = []
+    in_top_level = True
+    first_table_idx: int | None = None
     for line in lines:
         stripped = line.strip()
         matched = False
+        if stripped.startswith("[") and stripped.endswith("]"):
+            in_top_level = False
+            if first_table_idx is None:
+                first_table_idx = len(new_lines)
         for key in list(remaining):
             if stripped.startswith(f"{key} ") or stripped.startswith(f"{key}="):
-                new_lines.append(f"{key} = {_serialize_toml_value(remaining.pop(key))}")
                 matched = True
+                if in_top_level:
+                    new_lines.append(f"{key} = {_serialize_toml_value(remaining.pop(key))}")
                 break
         if not matched:
             new_lines.append(line)
 
-    for key, val in remaining.items():
-        new_lines.append(f"{key} = {_serialize_toml_value(val)}")
+    if remaining:
+        insert_at = first_table_idx if first_table_idx is not None else len(new_lines)
+        insert_lines = [
+            f"{key} = {_serialize_toml_value(val)}"
+            for key, val in remaining.items()
+        ]
+        new_lines[insert_at:insert_at] = insert_lines
 
     content = "\n".join(new_lines) + "\n"
     CODEX_CONFIG_PATH.write_text(content, encoding="utf-8")
