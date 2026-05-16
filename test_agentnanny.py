@@ -3084,7 +3084,7 @@ class TestRemoveCodexConfigKeys:
 class TestPatternsToCodexRules:
     def test_deny_bash_pattern(self):
         rules = agentnanny._patterns_to_codex_rules(["Bash(rm -rf /*)"], "forbidden")
-        assert 'pattern=["rm -rf /"]' in rules
+        assert 'pattern=["rm", "-rf", "/"]' in rules
         assert 'decision="forbidden"' in rules
         assert 'justification="blocked by agentnanny"' in rules
 
@@ -3099,7 +3099,7 @@ class TestPatternsToCodexRules:
 
     def test_deny_git_push_force(self):
         rules = agentnanny._patterns_to_codex_rules(["Bash(git push --force*)"], "forbidden")
-        assert 'pattern=["git push --force"]' in rules
+        assert 'pattern=["git", "push", "--force"]' in rules
         assert 'decision="forbidden"' in rules
 
     def test_deny_mixed_patterns(self):
@@ -3108,8 +3108,8 @@ class TestPatternsToCodexRules:
             "WebFetch",
             "Bash(DROP TABLE*)",
         ], "forbidden")
-        assert 'pattern=["rm -rf /"]' in rules
-        assert 'pattern=["DROP TABLE"]' in rules
+        assert 'pattern=["rm", "-rf", "/"]' in rules
+        assert 'pattern=["DROP", "TABLE"]' in rules
         assert "WebFetch" not in rules
 
     def test_allow_bash_pattern(self):
@@ -3122,9 +3122,9 @@ class TestPatternsToCodexRules:
         rules = agentnanny._patterns_to_codex_rules([
             "Bash(git log*)", "Bash(git diff*)", "Bash(git show*)",
         ], "allow")
-        assert 'pattern=["git log"]' in rules
-        assert 'pattern=["git diff"]' in rules
-        assert 'pattern=["git show"]' in rules
+        assert 'pattern=["git", "log"]' in rules
+        assert 'pattern=["git", "diff"]' in rules
+        assert 'pattern=["git", "show"]' in rules
 
     def test_allow_non_bash_skipped(self):
         rules = agentnanny._patterns_to_codex_rules(["Read", "Glob", "Grep"], "allow")
@@ -3332,8 +3332,8 @@ class TestApplyRemoveCodexSession:
         rules_path = codex_home / "rules" / "agentnanny-abc12345.rules"
         assert rules_path.exists()
         content = rules_path.read_text(encoding="utf-8")
-        assert 'pattern=["rm -rf /"]' in content
-        assert 'pattern=["git push --force"]' in content
+        assert 'pattern=["rm", "-rf", "/"]' in content
+        assert 'pattern=["git", "push", "--force"]' in content
         assert 'decision="forbidden"' in content
 
     def test_apply_generates_allow_rules(self, tmp_path):
@@ -3354,7 +3354,7 @@ class TestApplyRemoveCodexSession:
         rules_path = codex_home / "rules" / "agentnanny-abc12345.rules"
         assert rules_path.exists()
         content = rules_path.read_text(encoding="utf-8")
-        assert 'pattern=["git log"]' in content
+        assert 'pattern=["git", "log"]' in content
         assert 'decision="allow"' in content
 
     def test_remove_cleans_up(self, tmp_path):

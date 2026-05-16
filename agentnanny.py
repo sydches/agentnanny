@@ -8,6 +8,7 @@ import json
 import os
 import re
 import signal
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -600,6 +601,17 @@ def _remove_codex_config_keys(keys: list[str]) -> bool:
 _BASH_PATTERN_RE = re.compile(r'^Bash\((.+)\)$')
 
 
+def _codex_prefix_pattern(prefix: str) -> str:
+    """Render a shell prefix as a Codex argv-style Starlark pattern list."""
+    try:
+        parts = shlex.split(prefix)
+    except ValueError:
+        parts = [prefix]
+    if not parts:
+        parts = [prefix]
+    return "[" + ", ".join(json.dumps(part) for part in parts) + "]"
+
+
 def _patterns_to_codex_rules(patterns: list[str], decision: str) -> str:
     """Convert agentnanny Bash patterns to Codex Starlark exec policy rules.
 
@@ -619,7 +631,7 @@ def _patterns_to_codex_rules(patterns: list[str], decision: str) -> str:
             prefix = segment.rstrip("*").rstrip()
             if prefix:
                 rules.append(
-                    f'prefix_rule(pattern=["{prefix}"], decision="{decision}",'
+                    f'prefix_rule(pattern={_codex_prefix_pattern(prefix)}, decision="{decision}",'
                     f' justification="{justification} by agentnanny")'
                 )
     return "\n".join(rules)
