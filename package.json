@@ -1,0 +1,17 @@
+{
+  "name": "opencode-agentnanny",
+  "version": "0.1.0",
+  "description": "OpenCode plugin for agentnanny — session-scoped permission enforcement.",
+  "type": "module",
+  "main": "opencode-agentnanny.ts",
+  "exports": {
+    ".": "./opencode-agentnanny.ts"
+  },
+  "files": [
+    "opencode-agentnanny.ts",
+    "opencode-agentnanny-core.ts"
+  ],
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=1.0.0"
+  }
+}
