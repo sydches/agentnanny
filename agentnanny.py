@@ -40,7 +40,14 @@ CODEX_TRUST_PATH = CODEX_HOME / "trust.json"
 # OpenCode paths
 OPENCODE_CONFIG_HOME = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "opencode"
 OPENCODE_PLUGIN_DIR = OPENCODE_CONFIG_HOME / "plugins"
-OPENCODE_PLUGIN_FILES = ("opencode-agentnanny.ts", "opencode-agentnanny-core.ts")
+# (source-relative path, installed-relative path). OpenCode discovers plugins
+# with the non-recursive glob `{plugin,plugins}/*.{ts,js}`, so the core helper
+# must live under `lib/` — otherwise the loader treats it as a plugin and
+# throws `Plugin export is not a function` on its `builtinGroups` object.
+OPENCODE_PLUGIN_FILES = (
+    ("opencode/agentnanny.ts", "agentnanny.ts"),
+    ("opencode/lib/agentnanny-core.ts", "lib/agentnanny-core.ts"),
+)
 
 # Supported targets
 TARGETS = ("claude", "codex", "opencode")
@@ -1006,12 +1013,13 @@ def install_opencode_plugins():
     """Install the agentnanny OpenCode plugin into ~/.config/opencode/plugins/."""
     OPENCODE_PLUGIN_DIR.mkdir(parents=True, exist_ok=True)
     installed = []
-    for name in OPENCODE_PLUGIN_FILES:
-        src = SCRIPT_PATH.parent / name
+    for src_rel, dst_rel in OPENCODE_PLUGIN_FILES:
+        src = SCRIPT_PATH.parent / src_rel
         if not src.exists():
             print(f"Plugin source not found: {src}", file=sys.stderr)
             raise SystemExit(1)
-        dst = OPENCODE_PLUGIN_DIR / name
+        dst = OPENCODE_PLUGIN_DIR / dst_rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
         if dst.exists() and dst.read_bytes() == src.read_bytes():
             print(f"Already installed: {dst}", file=sys.stderr)
             continue
@@ -1028,14 +1036,18 @@ def install_opencode_plugins():
 def uninstall_opencode_plugins():
     """Remove the agentnanny OpenCode plugin from ~/.config/opencode/plugins/."""
     removed = []
-    for name in OPENCODE_PLUGIN_FILES:
-        path = OPENCODE_PLUGIN_DIR / name
+    for _src_rel, dst_rel in OPENCODE_PLUGIN_FILES:
+        path = OPENCODE_PLUGIN_DIR / dst_rel
         if path.exists():
             path.unlink()
             removed.append(path)
     if not removed:
         print("No agentnanny OpenCode plugins found", file=sys.stderr)
         raise SystemExit(1)
+    # Remove the now-empty lib/ dir if we created it.
+    lib_dir = OPENCODE_PLUGIN_DIR / "lib"
+    if lib_dir.is_dir() and not any(lib_dir.iterdir()):
+        lib_dir.rmdir()
     for p in removed:
         print(f"Removed {p}")
 

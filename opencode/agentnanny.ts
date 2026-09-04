@@ -14,7 +14,7 @@
  */
 
 import type { Plugin } from '@opencode-ai/plugin'
-import { auditLog, evaluateOpencodeTool, extractPrimaryInput, loadPolicy, mapToolName } from './opencode-agentnanny-core.ts'
+import { auditLog, evaluateOpencodeTool, extractPrimaryInput, loadPolicy, mapToolName } from './lib/agentnanny-core.ts'
 
 const AgentNannyPlugin: Plugin = async () => {
   // Cache allow verdicts per callID so `permission.ask` can short-circuit the
