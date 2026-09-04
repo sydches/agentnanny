@@ -182,8 +182,10 @@ Profiles, TTL, audit, and observability all behave as documented above:
 - `agentnanny sessions` / `explain` / `status` reflect the OpenCode scope.
 - TTL expiry reverts OpenCode to the static `opencode.json` baseline without a
   restart.
+- The plugin reads the session file on every tool call, so `activate` /
+  `deactivate` take effect without restarting OpenCode.
 
-**Known limits of the OpenCode plugin:**
+**Tradeoffs / known limits of the OpenCode plugin:**
 
 - Custom groups defined in `config.toml`'s `[groups]` are NOT expanded by the
   plugin — only the built-in groups (`filesystem`, `safe-shell`, etc.) are
@@ -199,8 +201,6 @@ Profiles, TTL, audit, and observability all behave as documented above:
   to `.1` (single backup). Python keeps its own finer-grained rotation for its
   writes.
 - The tmux daemon fallback (`agentnanny watch`) is Claude-only.
-- The plugin reads the session file on every tool call, so `activate` /
-  `deactivate` take effect without restarting OpenCode.
 
 ### Requirements
 
