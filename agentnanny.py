@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""agentnanny — granular permission manager for Claude Code and Codex CLI."""
+"""agentnanny — granular permission manager for Claude Code, Codex CLI, and OpenCode."""
 
 from __future__ import annotations
 
@@ -37,8 +37,13 @@ CODEX_HOME = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
 CODEX_CONFIG_PATH = CODEX_HOME / "config.toml"
 CODEX_TRUST_PATH = CODEX_HOME / "trust.json"
 
+# OpenCode paths
+OPENCODE_CONFIG_HOME = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "opencode"
+OPENCODE_PLUGIN_DIR = OPENCODE_CONFIG_HOME / "plugins"
+OPENCODE_PLUGIN_FILES = ("opencode-agentnanny.ts", "opencode-agentnanny-core.ts")
+
 # Supported targets
-TARGETS = ("claude", "codex")
+TARGETS = ("claude", "codex", "opencode")
 
 # Map agentnanny profiles to Codex approval_policy values
 CODEX_APPROVAL_MAP: dict[str, str] = {
@@ -997,6 +1002,44 @@ def uninstall_hooks():
     print(f"Removed agentnanny hooks from {SETTINGS_PATH}")
 
 
+def install_opencode_plugins():
+    """Install the agentnanny OpenCode plugin into ~/.config/opencode/plugins/."""
+    OPENCODE_PLUGIN_DIR.mkdir(parents=True, exist_ok=True)
+    installed = []
+    for name in OPENCODE_PLUGIN_FILES:
+        src = SCRIPT_PATH.parent / name
+        if not src.exists():
+            print(f"Plugin source not found: {src}", file=sys.stderr)
+            raise SystemExit(1)
+        dst = OPENCODE_PLUGIN_DIR / name
+        if dst.exists() and dst.read_bytes() == src.read_bytes():
+            print(f"Already installed: {dst}", file=sys.stderr)
+            continue
+        dst.write_bytes(src.read_bytes())
+        installed.append(dst)
+    if installed:
+        for p in installed:
+            print(f"Installed {p}")
+        print("OpenCode will auto-discover the plugin on next start.")
+    else:
+        print("Nothing to do.")
+
+
+def uninstall_opencode_plugins():
+    """Remove the agentnanny OpenCode plugin from ~/.config/opencode/plugins/."""
+    removed = []
+    for name in OPENCODE_PLUGIN_FILES:
+        path = OPENCODE_PLUGIN_DIR / name
+        if path.exists():
+            path.unlink()
+            removed.append(path)
+    if not removed:
+        print("No agentnanny OpenCode plugins found", file=sys.stderr)
+        raise SystemExit(1)
+    for p in removed:
+        print(f"Removed {p}")
+
+
 # ---------------------------------------------------------------------------
 # Trust directory
 # ---------------------------------------------------------------------------
@@ -1774,6 +1817,10 @@ def _build_policy(profile: str | None, groups: str | None, tools: str | None,
         "allow_groups": group_names,
         "allow_tools": tool_names,
         "deny": deny_patterns,
+        # Snapshot the global deny list so downstream consumers (notably the
+        # OpenCode plugin, which only reads the session file) see a single
+        # self-contained policy.
+        "_global_deny": list(cfg.get("hooks", {}).get("deny", [])),
     }
     if profile:
         policy["_profile_name"] = profile
@@ -2239,11 +2286,15 @@ def main():
     elif args.command == "install":
         if args.target == "codex":
             install_codex_hooks()
+        elif args.target == "opencode":
+            install_opencode_plugins()
         else:
             install_hooks()
     elif args.command == "uninstall":
         if args.target == "codex":
             uninstall_codex_hooks()
+        elif args.target == "opencode":
+            uninstall_opencode_plugins()
         else:
             uninstall_hooks()
     elif args.command == "trust":

@@ -3540,3 +3540,97 @@ class TestCodexStatus:
 
         err = capsys.readouterr().out
         assert "Exec policy rules: 2 file(s)" in err
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# OpenCode plugin install/uninstall
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestOpencodePlugin:
+    def _write_fake_plugin_sources(self, tmp_path):
+        """Drop fake plugin sources next to a patched SCRIPT_PATH."""
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        (src_dir / "opencode-agentnanny.ts").write_text("// plugin\n", encoding="utf-8")
+        (src_dir / "opencode-agentnanny-core.ts").write_text("// core\n", encoding="utf-8")
+        return src_dir
+
+    def test_install_copies_plugin_files(self, tmp_path):
+        src_dir = self._write_fake_plugin_sources(tmp_path)
+        plugin_dir = tmp_path / "plugins"
+
+        with patch.object(agentnanny, "SCRIPT_PATH", src_dir / "agentnanny.py"), \
+             patch.object(agentnanny, "OPENCODE_PLUGIN_DIR", plugin_dir):
+            agentnanny.install_opencode_plugins()
+
+        assert (plugin_dir / "opencode-agentnanny.ts").read_text() == "// plugin\n"
+        assert (plugin_dir / "opencode-agentnanny-core.ts").read_text() == "// core\n"
+
+    def test_install_idempotent(self, tmp_path):
+        src_dir = self._write_fake_plugin_sources(tmp_path)
+        plugin_dir = tmp_path / "plugins"
+
+        with patch.object(agentnanny, "SCRIPT_PATH", src_dir / "agentnanny.py"), \
+             patch.object(agentnanny, "OPENCODE_PLUGIN_DIR", plugin_dir):
+            agentnanny.install_opencode_plugins()
+            agentnanny.install_opencode_plugins()
+
+        assert (plugin_dir / "opencode-agentnanny.ts").exists()
+
+    def test_install_missing_source_exits(self, tmp_path):
+        plugin_dir = tmp_path / "plugins"
+        with patch.object(agentnanny, "SCRIPT_PATH", tmp_path / "agentnanny.py"), \
+             patch.object(agentnanny, "OPENCODE_PLUGIN_DIR", plugin_dir):
+            with pytest.raises(SystemExit):
+                agentnanny.install_opencode_plugins()
+
+    def test_uninstall_removes_plugin_files(self, tmp_path):
+        src_dir = self._write_fake_plugin_sources(tmp_path)
+        plugin_dir = tmp_path / "plugins"
+
+        with patch.object(agentnanny, "SCRIPT_PATH", src_dir / "agentnanny.py"), \
+             patch.object(agentnanny, "OPENCODE_PLUGIN_DIR", plugin_dir):
+            agentnanny.install_opencode_plugins()
+            agentnanny.uninstall_opencode_plugins()
+
+        assert not (plugin_dir / "opencode-agentnanny.ts").exists()
+        assert not (plugin_dir / "opencode-agentnanny-core.ts").exists()
+
+    def test_uninstall_nothing_to_remove_exits(self, tmp_path):
+        plugin_dir = tmp_path / "plugins"
+        plugin_dir.mkdir()
+        with patch.object(agentnanny, "OPENCODE_PLUGIN_DIR", plugin_dir):
+            with pytest.raises(SystemExit):
+                agentnanny.uninstall_opencode_plugins()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# _global_deny snapshot in session policy
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestGlobalDenySnapshot:
+    def _cfg(self, deny=None):
+        cfg = {
+            "groups": dict(agentnanny.BUILTIN_GROUPS),
+            "profiles": dict(agentnanny.BUILTIN_PROFILES),
+        }
+        if deny is not None:
+            cfg["hooks"] = {"deny": deny}
+        return cfg
+
+    def test_build_policy_snapshots_global_deny(self):
+        cfg = self._cfg(["Bash(rm -rf*)", "Bash(git push --force*)"])
+        policy, _ = agentnanny._build_policy("safe-dev", None, None, None, None, cfg)
+        assert policy["_global_deny"] == ["Bash(rm -rf*)", "Bash(git push --force*)"]
+
+    def test_build_policy_empty_global_deny(self):
+        policy, _ = agentnanny._build_policy("safe-dev", None, None, None, None, self._cfg())
+        assert policy["_global_deny"] == []
+
+    def test_build_policy_snapshot_is_a_copy(self):
+        cfg = self._cfg(["Bash(rm*)"])
+        policy, _ = agentnanny._build_policy("safe-dev", None, None, None, None, cfg)
+        cfg["hooks"]["deny"].append("Bash(curl*)")
+        assert policy["_global_deny"] == ["Bash(rm*)"]
