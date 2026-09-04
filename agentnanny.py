@@ -45,8 +45,8 @@ OPENCODE_PLUGIN_DIR = OPENCODE_CONFIG_HOME / "plugins"
 # must live under `lib/` — otherwise the loader treats it as a plugin and
 # throws `Plugin export is not a function` on its `builtinGroups` object.
 OPENCODE_PLUGIN_FILES = (
-    ("opencode/agentnanny.ts", "agentnanny.ts"),
-    ("opencode/lib/agentnanny-core.ts", "lib/agentnanny-core.ts"),
+    ("opencode/plugin/agentnanny.ts", "agentnanny.ts"),
+    ("opencode/plugin/lib/agentnanny-core.ts", "lib/agentnanny-core.ts"),
 )
 
 # Supported targets

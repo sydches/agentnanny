@@ -140,7 +140,7 @@ Deny/allow `Bash(...)` patterns translate to Codex Starlark `prefix_rule()` dire
 ### OpenCode
 
 OpenCode is a first-class agentnanny target. Session policies are enforced by a
-plugin (`opencode/agentnanny.ts`, shipped in this repo) installed into
+plugin (`opencode/plugin/agentnanny.ts`, shipped in this repo) installed into
 `~/.config/opencode/plugins/`, which OpenCode auto-discovers. The plugin reads
 the same session file written by `activate` / `run` and applies the same
 evaluate order as the Claude hook: global deny → session deny → session allow →

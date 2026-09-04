@@ -19,5 +19,5 @@
 
     "types": ["node"]
   },
-  "include": ["opencode/**/*.ts"]
+  "include": ["plugin/**/*.ts"]
 }

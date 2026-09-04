@@ -3549,11 +3549,11 @@ class TestCodexStatus:
 
 class TestOpencodePlugin:
     def _write_fake_plugin_sources(self, tmp_path: Path) -> Path:
-        """Drop fake plugin sources mirroring the opencode/ layout next to a patched SCRIPT_PATH."""
+        """Drop fake plugin sources mirroring the opencode/plugin/ layout next to a patched SCRIPT_PATH."""
         src_dir = tmp_path / "src"
-        (src_dir / "opencode" / "lib").mkdir(parents=True)
-        (src_dir / "opencode" / "agentnanny.ts").write_text("// plugin\n", encoding="utf-8")
-        (src_dir / "opencode" / "lib" / "agentnanny-core.ts").write_text("// core\n", encoding="utf-8")
+        (src_dir / "opencode" / "plugin" / "lib").mkdir(parents=True)
+        (src_dir / "opencode" / "plugin" / "agentnanny.ts").write_text("// plugin\n", encoding="utf-8")
+        (src_dir / "opencode" / "plugin" / "lib" / "agentnanny-core.ts").write_text("// core\n", encoding="utf-8")
         return src_dir
 
     def test_install_copies_plugin_files(self, tmp_path: Path) -> None:
