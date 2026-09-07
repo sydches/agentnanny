@@ -1,6 +1,6 @@
 # agentnanny
 
-Stop clicking "Allow" on every Claude Code permission prompt. Works with Codex CLI too.
+Stop clicking "Allow" on every Claude Code permission prompt. Works with Codex CLI and OpenCode too.
 
 agentnanny auto-approves the tools you trust (file reads, shell commands, etc.) while still blocking the ones you don't (force-push, rm -rf, DROP TABLE). Each terminal gets its own rules. Permissions expire automatically.
 
@@ -8,7 +8,7 @@ agentnanny auto-approves the tools you trust (file reads, shell commands, etc.) 
 
 **After:** Pick a profile, start working. Safe operations auto-approve. Dangerous commands still prompt.
 
-**Supports:** Claude Code (hooks) and OpenAI Codex CLI (exec policy rules + config patching).
+**Supports:** Claude Code (hooks), OpenAI Codex CLI (exec policy rules + config patching), and OpenCode (native plugin).
 
 ## Quick Start
 
@@ -136,6 +136,71 @@ Profile-to-Codex approval policy mapping:
 | ci-runner | never |
 
 Deny/allow `Bash(...)` patterns translate to Codex Starlark `prefix_rule()` directives in `~/.codex/rules/`. Non-Bash patterns are skipped (Codex controls file operations via `approval_policy`).
+
+### OpenCode
+
+OpenCode is a first-class agentnanny target. Session policies are enforced by a
+plugin (`opencode/plugin/agentnanny.ts`, shipped in this repo) installed into
+`~/.config/opencode/plugins/`, which OpenCode auto-discovers. The plugin reads
+the same session file written by `activate` / `run` and applies the same
+evaluate order as the Claude hook: global deny → session deny → session allow →
+passthrough.
+
+```bash
+python agentnanny.py install --target opencode     # copy plugin into ~/.config/opencode/plugins/
+python agentnanny.py uninstall --target opencode   # remove it
+```
+
+With no active scope (no `AGENTNANNY_SCOPE`, no session file, expired TTL, or a
+malformed/absent session file), the plugin is a no-op and the static
+`opencode.json` permission policy continues to govern.
+
+**Security posture:** with a scope active, session-allowed tools bypass
+`opencode.json` `ask` prompts entirely — e.g. a `safe-dev` scope turns
+`bash: {"*": "ask"}` into a silent auto-allow for anything the session allows.
+Static `deny` rules in `opencode.json` still apply and can never be overridden
+by a session; session/global denies are enforced by the plugin's
+`tool.execute.before` hook throwing before the tool runs.
+
+**Activate / deactivate / run** (same workflow as Claude):
+
+```bash
+# Persistent terminal scope
+eval $(python agentnanny.py activate safe-dev --target opencode)
+opencode
+
+# Deactivate
+eval $(python agentnanny.py deactivate --target opencode)
+
+# One-shot run (auto-cleans on exit)
+python agentnanny.py run safe-dev --target opencode -- opencode
+```
+
+Profiles, TTL, audit, and observability all behave as documented above:
+
+- `agentnanny log` shows plugin decisions under the `opencode-plugin` source.
+- `agentnanny sessions` / `explain` / `status` reflect the OpenCode scope.
+- TTL expiry reverts OpenCode to the static `opencode.json` baseline without a
+  restart.
+- The plugin reads the session file on every tool call, so `activate` /
+  `deactivate` take effect without restarting OpenCode.
+
+**Tradeoffs / known limits of the OpenCode plugin:**
+
+- Custom groups defined in `config.toml`'s `[groups]` are NOT expanded by the
+  plugin — only the built-in groups (`filesystem`, `safe-shell`, etc.) are
+  recognized. Use `--tools`/`-t` for tool-level allowances that don't fit a
+  builtin group.
+- The global deny list is snapshotted into the session file at `activate` time.
+  After editing `[hooks].deny` in `config.toml`, re-run `activate` for OpenCode
+  sessions to pick it up (Claude sessions read it live).
+- The plugin reads its audit-log path from `AGENTNANNY_LOG`, defaulting to
+  `/tmp/agentnanny.log`. If you customize `[logging].audit_log` in
+  `config.toml`, set `AGENTNANNY_LOG` to the same value when launching OpenCode.
+- Audit-log rotation is coarse on the plugin side: at 10 MB the log is renamed
+  to `.1` (single backup). Python keeps its own finer-grained rotation for its
+  writes.
+- The tmux daemon fallback (`agentnanny watch`) is Claude-only.
 
 ### Requirements
 
@@ -342,8 +407,8 @@ Detects: permission prompts (selects "allow for project" or "yes"), trust prompt
 
 | Command | Description |
 |---|---|
-| `install [--target]` | Register hooks (`claude` or `codex`) |
-| `uninstall [--target]` | Remove hooks (`claude` or `codex`) |
+| `install [--target]` | Register hooks (`claude`, `codex`, or `opencode`) |
+| `uninstall [--target]` | Remove hooks (`claude`, `codex`, or `opencode`) |
 | `trust [dir]` | Pre-trust a directory |
 | `run <profile> [--target] -- <cmd>` | Run command with session-scoped permissions |
 | `activate [profile] [--target]` | Create a session policy (prints `export` command) |
@@ -361,4 +426,4 @@ Detects: permission prompts (selects "allow for project" or "yes"), trust prompt
 | `watch [session]` | Start tmux daemon |
 | `stop` | Stop tmux daemon |
 
-`--target` accepts `claude` (default) or `codex`.
+`--target` accepts `claude` (default), `codex`, or `opencode`.
